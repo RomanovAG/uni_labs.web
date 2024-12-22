@@ -1,0 +1,39 @@
+/* styles/global.scss */
+
+/* Основные переменные */
+:root {
+    --primary-color: #3498db;
+    --primary-color-dark: #2980b9;
+    --secondary-color: #2ecc71;
+    --secondary-color-dark: #3bac6a;
+    --red-color: #dd4141;
+    --red-color-dark: #bb2121;
+    --background-color: #f4f4f4;
+    /* --background-color: #1b1b1b; */
+    --text-color: #333;
+    --font-family: 'Arial', sans-serif;
+  }
+  
+/* Сброс стилей */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+/* Основные стили */
+  body {
+    font-family: var(--font-family);
+    background-color: var(--background-color);
+    color: var(--text-color);
+  }
+  
+  a {
+    color: var(--primary-color);
+    text-decoration: none;
+  
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  
