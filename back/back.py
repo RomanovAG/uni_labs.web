@@ -42,7 +42,13 @@ def update_sqlite_sequence():
 
     for table in tables:
         table_name = table[0]
-        cur.execute(f"UPDATE sqlite_sequence SET seq = (SELECT IFNULL(MAX(id), 0) FROM {table_name}) WHERE name = ?", (table_name,))
+
+        cur.execute(f"PRAGMA table_info({table_name})")
+        columns = cur.fetchall()
+        if columns:
+            first_column_name = columns[0][1]
+
+        cur.execute(f"UPDATE sqlite_sequence SET seq = (SELECT IFNULL(MAX({first_column_name}), 0) FROM {table_name}) WHERE name = ?", (table_name,))
 
     con.commit()
     con.close()
@@ -207,6 +213,8 @@ def get_mall_data(mall_id: int):
         sensor_id = int(db_sensor_in_mall[1])
         cursor.execute('SELECT * FROM sensors WHERE sensor_id = ?', (sensor_id,))
         db_sensor = cursor.fetchone()
+        if not db_sensor:
+            continue
 
         cursor.execute('SELECT * FROM sensor_of_user WHERE user_id = ? AND sensor_id = ?', (g.user_id, sensor_id))
         accessible = cursor.fetchone() is not None
@@ -225,12 +233,41 @@ def get_mall_data(mall_id: int):
 @app.route('/api/malls/<int:mall_id>/save', methods=['POST'])
 @check_auth
 def set_mall_data(mall_id: int):
+    if not is_admin(g.user_id):
+        return jsonify({'error': 'not an admin'}), 403
     data = request.get_json()
     sensors = data['sensors']
-    app.logger.info(sensors)
-    #con = sqlite3.connect(DB_PATH)
-    #cursor = con.cursor()
+
+    con = sqlite3.connect(DB_PATH)
+    cursor = con.cursor()
+    cursor.execute('DELETE FROM sensor_in_mall WHERE mall_id = ?', (mall_id,))
+    con.commit()
+    con.close()
+    update_sqlite_sequence()
+
+    con = sqlite3.connect(DB_PATH)
+    cursor = con.cursor()
+    for sensor_front in sensors:
+        cursor.execute('SELECT * FROM sensors WHERE mac = ?', (sensor_front['mac'],))
+        sensor = cursor.fetchone()
+        if not sensor:
+            cursor.execute('INSERT INTO sensors (mac, state) VALUES (?, ?)', (sensor_front['mac'], sensor_front['state']))
+            cursor.execute('SELECT * FROM sensors WHERE mac = ?', (sensor_front['mac'],))
+            sensor = cursor.fetchone()
+        else:
+            cursor.execute('UPDATE sensors SET state = ? WHERE mac = ?', (sensor_front['state'], sensor_front['mac']))
+
+        cursor.execute('INSERT INTO sensor_in_mall (sensor_id, mall_id, x, y, floor, date_start, date_end) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                       (int(sensor[0]), int(mall_id), int(sensor_front['x']), int(sensor_front['y']), int(sensor_front['floor']), '-', '-'))
+
+    con.commit()
+    con.close()
     return jsonify({'message': 'done'})
+
+@app.route('/api/malls/<int:mall_id>/devices', methods=['GET'])
+@check_auth
+def get_detected_devices(mall_id: int):
+    jsonify({'message': 'done'}) 
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -332,6 +369,16 @@ def reject_user():
     con.close()
     update_sqlite_sequence()
     return jsonify({'message': 'done'})
+
+@app.route('/api/sensors/<string:sensor_mac>/activate', methods=['POST'])
+@check_auth
+def activate_sensor(sensor_mac):
+    con = sqlite3.connect(DB_PATH)
+    cursor = con.cursor()
+    cursor.execute()
+    con.commit()
+    con.close()
+    jsonify({'message': 'done'})
 
 def main():
     # app.run(host='192.168.90.203', debug=True)

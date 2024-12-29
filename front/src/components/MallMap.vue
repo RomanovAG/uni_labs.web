@@ -1,10 +1,10 @@
 <template>
 <!-- <router-view :key="$route.fullPath"></router-view> -->
 <TopBar/>
+
 <div>
   <div class="canvas-container" @contextmenu.prevent style="display: flex;">
-    <!-- <MallsList/> -->
-    <div class="white_box" style="margin: 1rem; display: block;padding: 1rem;">
+    <div v-if="isAdminComp" class="white_box" style="margin: 1rem; display: block;padding: 1rem;">
       <button @click="saveSensorsData" class="button_blue" style="margin: 0.25rem; min-width: 3rem;">Сохранить</button>
     </div>
 
@@ -31,7 +31,7 @@
       </ul>
       </div>
       <div v-else>
-      <div v-if="selectedSensor.accessible">
+      <div v-if="selectedSensor.accessible || isAdminComp">
       <ul >
         <p>Координаты: ({{ selectedSensor.x.toFixed(0) }}, {{ selectedSensor.y.toFixed(0) }})</p>
         <p>MAC:
@@ -39,7 +39,7 @@
           <span v-else @click="startEditingMac">{{ selectedSensor.mac || 'No MAC' }}</span>
         </p>
         <p>Состояние: 
-          <select v-if="isAdmin" v-model="selectedSensor.state">
+          <select v-if="isAdminComp" v-model="selectedSensor.state">
             <option :value=1>Активен</option>
             <option :value=0>Неактивен</option>
           </select>
@@ -57,7 +57,7 @@
     </div>
     
     <div 
-      v-if="tooltipVisible && hoveredSensor.accessible" 
+      v-if="tooltipVisible && (hoveredSensor.accessible || isAdminComp)" 
       :style="{ top: `${tooltipPosition.y - 75}px`, left: `${tooltipPosition.x}px` }" 
       class="tooltip"
     >
@@ -66,7 +66,7 @@
       <p>Состояние: {{ hoveredSensor.state === 0 ? 'Неактивен' : 'Активен' }}</p>
     </div>
     <div 
-      v-if="tooltipVisible && !hoveredSensor.accessible" 
+      v-if="tooltipVisible && !hoveredSensor.accessible && !isAdminComp" 
       :style="{ top: `${tooltipPosition.y - 75}px`, left: `${tooltipPosition.x}px` }" 
       class="tooltip"
     >
@@ -104,10 +104,18 @@
           <li><button @click="zoom(100)"  class="button_blue" style="margin: 0.25rem; min-width: 3rem;">-</button></li>
         </ul>
       </div>
-
-      
     </div>
-    
+    <div v-if="isAdminComp" class="white_box" style="margin: 1rem; display: block;padding: 1rem;"> Датчики на этаже
+      <ul style="list-style: none; margin: 1rem;">
+        <li v-for="(sensor, id) in sensors" >
+          <div v-if="sensor.floor === mall.floor">
+            <span>{{sensor.mac}}--</span>
+            <span> </span>
+            <input type="checkbox" :checked="sensor.state === 1" @change="handleCheckboxChange(sensor, $event)"></input>
+          </div >
+        </li>
+      </ul>
+    </div>
   </div>
   
   <div style="display: block;">
@@ -170,12 +178,12 @@ export default {
       isEditingMac: false,
     };
   },
-  // computed: {
-  //   isAdmin() {
-  //     const user = JSON.parse(localStorage.getItem('user'));
-  //     return user.role === 'admin';
-  //   }
-  // },
+  computed: {
+    isAdminComp() {
+      const user = JSON.parse(localStorage.getItem('user'));
+      return user.role === 'admin';
+    }
+  },
   async mounted() {
     const route = useRoute();
     this.mall.id = Number(route.params.mallId);
@@ -290,6 +298,10 @@ export default {
         else {
           context.fillStyle = "gray";
           [ r, g, b ] = [ 128, 128, 128 ];
+        }
+
+        if (!sensor.state) {
+          [ r, g, b ] = [ 128, 0, 0 ];
         }
         context.shadowColor = "rgba(0, 0, 0, 0)";
         context.shadowBlur = 0;
@@ -482,6 +494,11 @@ export default {
     stopEditingMac() {
       this.isEditingMac = false;
     },
+    handleCheckboxChange(sensor, event) {
+      sensor.state = event.target.checked ? 1 : 0;
+      this.drawAll();
+      console.log(`Sensor ${sensor.mac} state changed to: ${sensor.state}`);
+    }
   }
 };
 </script>
