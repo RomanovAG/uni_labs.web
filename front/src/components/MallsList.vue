@@ -1,10 +1,10 @@
 <template>
 <router-view :key="$route.fullPath"></router-view>
 <ul>
-  <li v-for="mall in malls" style="margin: 1rem;">
+  <li v-for="mall in malls" style="margin-top: 1rem;">
   <!-- <router-link :to="{ path: `/malls/${mall.id}`}">{{ mall.name }}</router-link> -->
     <button v-if="Number($route.params.mallId) === mall.id" class="button_blue" style="background-color: var(--secondary-color);" @click="goToMall(mall)">{{ mall.name }}</button>
-    <button v-else class="button_blue" @click="goToMall(mall)">{{ mall.name }}</button>
+    <button v-else class="button_blue" style="min-width: 15rem; text-align: left;" @click="goToMall(mall)">{{ mall.name }}</button>
   </li>
 </ul>
 </template>

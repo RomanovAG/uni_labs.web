@@ -5,15 +5,15 @@
 <div>
   <div class="canvas-container" @contextmenu.prevent style="display: flex;">
     <div v-if="isAdminComp" class="white_box" style="margin: 1rem; display: block;padding: 1rem;">
-      <button @click="saveSensorsData" class="button_blue" style="margin: 0.25rem; min-width: 3rem;">Сохранить</button>
+      <button @click="saveSensorsData" class="button_blue" style="margin: 0.25rem; min-width: 3rem;" title="Сохранить состояние и расположение датчиков">Сохранить</button>
     </div>
 
-    <canvas style=""
+    <canvas style="margin-top: 1rem;"
       ref="canvas"
       @mousedown="onMouseDown"
       @mouseup="onMouseUp"
       @mousemove="onMouseMove"
-      @wheel="onWheel"
+      @wheel.prevent="onWheel"
 
       @mousedown.right="onMouseRightClick"
 
@@ -26,34 +26,34 @@
       class="context-menu"
     >
       <div v-if="(contextAction === 'add')">
-      <ul >
-        <li @click="addSensor">Установить датчик</li>
-      </ul>
+        <ul >
+          <li @click="addSensor">Установить датчик</li>
+        </ul>
       </div>
       <div v-else>
-      <div v-if="selectedSensor.accessible || isAdminComp">
-      <ul >
-        <p>Координаты: ({{ selectedSensor.x.toFixed(0) }}, {{ selectedSensor.y.toFixed(0) }})</p>
-        <p>MAC:
-          <input v-if="isEditingMac && isAdmin" v-model="selectedSensor.mac" @blur="stopEditingMac" />
-          <span v-else @click="startEditingMac">{{ selectedSensor.mac || 'No MAC' }}</span>
-        </p>
-        <p>Состояние: 
-          <select v-if="isAdminComp" v-model="selectedSensor.state">
-            <option :value=1>Активен</option>
-            <option :value=0>Неактивен</option>
-          </select>
-          <span v-else>{{ selectedSensor.state === 1 ? 'Активен' : 'Неактивен' }}</span>
-        </p>
-        <li v-if="isAdmin" @click="deleteSensor">Удалить датчик</li>
-        <li @click="hideContextMenu">Закрыть меню</li>
-      </ul>
+        <div v-if="selectedSensor.accessible || isAdminComp">
+          <ul >
+            <p>Координаты: ({{ selectedSensor.x.toFixed(0) }}, {{ selectedSensor.y.toFixed(0) }})</p>
+            <p>MAC:
+              <input style="font-family: 'Consolas'" v-if="isEditingMac && isAdminComp" v-model="selectedSensor.mac" @blur="stopEditingMac" />
+              <span  v-else @click="startEditingMac">{{ selectedSensor.mac || 'No MAC' }}</span>
+            </p>
+            <p>Состояние: 
+              <select v-if="isAdminComp" v-model="selectedSensor.state" @click="drawAll" title="Переключить состояние датчика">
+                <option :value=1>Активен</option>
+                <option :value=0>Неактивен</option>
+              </select>
+              <span v-else>{{ selectedSensor.state === 1 ? 'Активен' : 'Неактивен' }}</span>
+            </p>
+            <li v-if="isAdminComp" @click="deleteSensor">Удалить датчик</li>
+            <li @click="hideContextMenu">Закрыть меню</li>
+          </ul>
+        </div>
+        <div v-else>
+          <div v-if="selectedSensor.requestCreated">Заявка на рассмотрении</div>
+          <button v-else @click="createRequest">Запросить</button>
+        </div>
       </div>
-      <div v-else>
-        <button>Запросить</button>
-      </div>
-      </div>
-      
     </div>
     
     <div 
@@ -76,10 +76,14 @@
     <div style="display: block; margin-left: 1rem">
       <div class="white_box" style="padding: 1rem;">
         <p style="text-align: center; margin-bottom: 0.1rem;">Этаж</p>
-        <ul>
+        <ul style="margin-top: 0.5rem;">
           <li v-for="(image, index) in mall.images" style="list-style: none;">
             <button v-if="mall.images.length - index - 1 === imageIndex()" 
-            @click="changeMallFloor(mall.images.length - index - 1)" class="button_blue" style="margin: 0.25rem; min-width: 3rem; background-color: var(--secondary-color);">
+            @click="changeMallFloor(mall.images.length - index - 1)" class="button_blue" style="margin: 0.25rem; min-width: 3rem; background-color: var(--secondary-color);"
+            :title="
+                    mall.images.length - index - 1 - mall.undergroundFloorsCount >= 0 ? 
+                    mall.images.length - index - 1 - mall.undergroundFloorsCount + 1 : 
+                    mall.images.length - index - 1 - mall.undergroundFloorsCount">
             {{
               mall.images.length - index - 1 - mall.undergroundFloorsCount >= 0 ? 
               mall.images.length - index - 1 - mall.undergroundFloorsCount + 1 : 
@@ -87,7 +91,11 @@
             }}
             </button>
             <button v-else 
-            @click="changeMallFloor(mall.images.length - index - 1)" class="button_blue" style="margin: 0.25rem; min-width: 3rem;">
+            @click="changeMallFloor(mall.images.length - index - 1)" class="button_blue" style="margin: 0.25rem; min-width: 3rem;"
+            :title="
+                    mall.images.length - index - 1 - mall.undergroundFloorsCount >= 0 ? 
+                    mall.images.length - index - 1 - mall.undergroundFloorsCount + 1 : 
+                    mall.images.length - index - 1 - mall.undergroundFloorsCount">
             {{
               mall.images.length - index - 1 - mall.undergroundFloorsCount >= 0 ? 
               mall.images.length - index - 1 - mall.undergroundFloorsCount + 1 : 
@@ -100,8 +108,8 @@
 
       <div class="white_box" style="margin-top: 1rem; display: block;padding: 1rem;">
         <ul style="list-style: none;">
-          <li><button @click="zoom(-100)" class="button_blue" style="margin: 0.25rem; min-width: 3rem;">+</button></li>
-          <li><button @click="zoom(100)"  class="button_blue" style="margin: 0.25rem; min-width: 3rem;">-</button></li>
+          <li><button @click="zoom(-100)" class="button_blue" style="margin: 0.25rem; min-width: 3rem;" title="Приблизить">+</button></li>
+          <li><button @click="zoom(100)"  class="button_blue" style="margin: 0.25rem; min-width: 3rem;" title="Отдалить  ">-</button></li>
         </ul>
       </div>
     </div>
@@ -109,23 +117,46 @@
       <ul style="list-style: none; margin: 1rem;">
         <li v-for="(sensor, id) in sensors" >
           <div v-if="sensor.floor === mall.floor">
-            <span>{{sensor.mac}}--</span>
-            <span> </span>
-            <input type="checkbox" :checked="sensor.state === 1" @change="handleCheckboxChange(sensor, $event)"></input>
+            <span style="font-family: 'Consolas'">{{sensor.mac}}</span>
+            <input style="margin-left: 1rem;" type="checkbox" :checked="sensor.state === 1" 
+            @change="handleCheckboxChange(sensor, $event)" title="Переключить состояние датчика"></input>
           </div >
         </li>
       </ul>
     </div>
   </div>
-  
+  <div style="margin-top: 1rem;">
+    <div style="margin: auto; max-width: 75%; text-align: center;">
+      <div style="margin: auto; display: flex; max-height: 7rem;">
+        <div class="white_box" style="flex: 25%;">
+          <span>Точность:</span>
+          <input type="number" style="margin-left: 1rem;" v-model="precision" id="precision" step="1" min="1" max="3" @change="drawAll"/>
+        </div>
+        <div class="white_box" style="flex: 85%; margin-left: 1rem;">
+          <input type="range" style="margin-left: 1rem; min-width: 75%;"
+                v-model="selectedTimestampIndex" 
+                :min="0" 
+                :max="transformedData.length - 1" 
+                @input="updateSelectedTimestamp" />
+          <div style="margin-top: 1rem; " v-if="currentData">
+            <p style="text-align: center;">Выбранная временная метка: {{ currentData.timestamp }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="currentData">
+      <p>Данные:</p>
+      <pre>{{ currentData.devices }}</pre>
+    </div>
+  </div>
   <div style="display: block;">
     <span>Размер датчиков:</span>
-    <input type="number" v-model="sensorSize" id="sensorSize" step="1" @change="drawAll" />
+    <input type="number" style="" v-model="sensorSize" id="sensorSize" step="1" @change="drawAll" />
   </div>
 </div>
-  <div>
-    scale: {{ this.scale }}; img x: {{ this.offsetX }} y: {{ this.offsetY }};
-  </div>
+<!-- <div>
+  scale: {{ this.scale }}; img x: {{ this.offsetX }} y: {{ this.offsetY }};
+</div> -->
 </template>
 
 <script>
@@ -139,8 +170,6 @@ export default {
   },
   data() {
     return {
-      canvasWidth: 800,        // Ширина Canvas
-      canvasHeight: 600,       // Высота Canvas
       offsetX: 0,               // Позиция X изображения
       offsetY: 0,               // Позиция Y изображения
       scale: 1,                // Масштаб изображения
@@ -168,7 +197,7 @@ export default {
         undergroundFloorsCount: null,
         images: [],
       },
-      
+
       image: null,
       sensors: [],
 
@@ -176,13 +205,19 @@ export default {
       hoveredSensor: null,
 
       isEditingMac: false,
+      transformedData: [],
+      selectedTimestampIndex: 0,
+      precision: 1,
     };
   },
   computed: {
     isAdminComp() {
       const user = JSON.parse(localStorage.getItem('user'));
       return user.role === 'admin';
-    }
+    },
+    currentData() {
+      return this.transformedData[this.selectedTimestampIndex];
+    },
   },
   async mounted() {
     const route = useRoute();
@@ -206,22 +241,36 @@ export default {
       }
 
       $this.sensors = response.data.sensors;
-    })
+    }).catch(function(error) {
+      console.error(error);
+      const msg = error?.response?.data.error || error;
+      alert(error);
+    });
+    this.getDevices();
     document.title =  this.mall.name || route.path;
 
-    const canvas = this.$refs.canvas;
-    canvas.width = this.canvasWidth;
-    canvas.height = this.canvasHeight;
+    this.$nextTick(() => {
+      this.setCanvasSize();
+    });
+    window.addEventListener('resize', this.setCanvasSize);
     this.loadImages();
+
+    const canvas = this.$refs.canvas;
     try {
       this.image.onload = () => {
-        this.offsetX = (this.canvasWidth - this.image.width) / 2;
-        this.offsetY = (this.canvasHeight - this.image.height) / 2;
+        this.offsetX = (canvas.width - this.image.width) / 2;
+        this.offsetY = (canvas.height - this.image.height) / 2;
         this.drawAll();
       };
     } catch (error) {}
   },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.setCanvasSize);
+  },
   methods: {
+    updateSelectedTimestamp() {
+      this.drawAll();
+    },
     clamp(num, min, max) {
       return num <= min
         ? min 
@@ -232,6 +281,25 @@ export default {
     isAdmin() {
       const user = JSON.parse(localStorage.getItem('user'));
       return user.role === 'admin';
+    },
+    async setCanvasSize() {
+      const canvas = this.$refs.canvas;
+      try {
+        canvas.width = window.innerWidth*0.6;
+        canvas.height = window.innerHeight*0.75;
+        this.drawAll();
+      } catch (error) {}
+    },
+    async getDevices() {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = localStorage.getItem('token');
+      const $this = this;
+      await this.$axios.get(`/api/malls/${this.mall.id}/devices`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(function(response) {
+        console.log(response.data);
+        $this.transformedData = response.data;
+      });
     },
     origCoords(x, y) {
       const rect = this.$refs.canvas.getBoundingClientRect();
@@ -267,7 +335,7 @@ export default {
         alert(error);
       }
     },
-    drawImage() {
+    async drawImage() {
       const canvas = this.$refs.canvas;
       const context = canvas.getContext("2d");
       context.save();
@@ -278,7 +346,7 @@ export default {
       } catch (error) {}
       context.restore();
     },
-    drawSensors() {
+    async drawSensors() {
       const canvas = this.$refs.canvas;
       const context = canvas.getContext('2d');
       context.save();
@@ -337,10 +405,78 @@ export default {
       });
       context.restore();
     },
-    drawAll() {
-      this.$refs.canvas.getContext("2d").clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+    drawSmoothPentagon(x, y, radius, smoothness, context) {
+      const angle = (2 * Math.PI) / 5;
+      context.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const x1 = x + radius * Math.cos(i * angle);
+        const y1 = y + radius * Math.sin(i * angle);
+        const x2 = x + radius * Math.cos((i + 1) * angle);
+        const y2 = y + radius * Math.sin((i + 1) * angle);
+        
+        if (i === 0) {
+          context.moveTo(x1, y1);
+        } else {
+          const cpX1 = x + (x1 + x2) / 2;
+          const cpY1 = y + (y1 + y2) / 2;
+          context.arcTo(x1, y1, cpX1, cpY1, smoothness);
+        }
+      }
+      context.closePath();
+      context.fillStyle = 'lightblue';
+      context.fill();
+      context.lineWidth = 1 / this.scale;
+      context.strokeStyle = 'black';
+      context.stroke();
+    },
+    async drawDevices() {
+      const canvas = this.$refs.canvas;
+      const context = canvas.getContext('2d');
+      context.save();
+      context.translate(this.offsetX, this.offsetY);
+      context.scale(this.scale, this.scale);
+
+      this.currentData?.devices.forEach((device) => {
+        let [ x, y ] = [ 0, 0 ];
+        let [ r, g, b ] = [ 255, 128, 0 ];
+        let a = 1;
+        let sensorSize = this.sensorSize;
+        context.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+        
+        let floor = 0;
+        let coeff = 0;
+        let active = 0;
+        device.sensors.forEach(sensor => {
+          const found_sensor = this.sensors.find(s => s.mac == sensor.mac);
+          if (!found_sensor) return;
+          if (!found_sensor.accessible && !this.isAdmin()) return;
+          floor += found_sensor.floor * sensor.normalized_rssi;
+          x += found_sensor.x * sensor.normalized_rssi;
+          y += found_sensor.y * sensor.normalized_rssi;
+          coeff += sensor.normalized_rssi;
+          active += 1;
+        });
+        floor /= coeff;
+        x /= coeff;
+        y /= coeff;
+
+        if (this.precision > active) return;
+        if (Math.round(floor) !== this.mall.floor) return;
+        //this.drawSmoothPentagon(x, y, sensorSize * 1.25 / this.scale, 5 / this.scale, context);
+        context.beginPath();
+        context.arc(x, y, sensorSize / 2 / this.scale, 0, 2 * Math.PI);
+        context.fill();
+        context.lineWidth = 1 / this.scale;
+        context.strokeStyle = 'black';
+        context.stroke();
+      });
+      context.restore();
+    },
+    async drawAll() {
+      this.$refs.canvas.getContext("2d").clearRect(0, 0, this.$refs.canvas.width, this.$refs.canvas.height);
       this.drawImage();
       this.drawSensors();
+      this.drawDevices();
     },
     async saveSensorsData() {
       const user = JSON.parse(localStorage.getItem('user'));
@@ -351,9 +487,11 @@ export default {
         headers: { 'Authorization': `Bearer ${token}` },
         sensors: this.sensors
       }).then(function(response) {
-
+        alert('Сохранено');
       }).catch(function(error) {
-
+        console.error(error);
+        const msg = error?.response?.data.error || error;
+        alert(error);
       });
     },
     onMouseDown(event) {
@@ -383,7 +521,7 @@ export default {
     },
     onMouseMove(event) {
       const [ x, y ] = this.origCoords(event.clientX, event.clientY);
-
+      const canvas = this.$refs.canvas;
       if (this.isDragging && this.selectedSensor) {
         this.selectedSensor.x = x - this.dragOffset.x;
         this.selectedSensor.y = y - this.dragOffset.y;
@@ -392,13 +530,13 @@ export default {
         this.offsetX = event.clientX - this.panStartX;
         this.offsetY = event.clientY - this.panStartY;
 
-        this.offsetX = this.clamp(this.offsetX, -this.image.width * this.scale, this.canvasWidth);
-        this.offsetY = this.clamp(this.offsetY, -this.image.height * this.scale, this.canvasHeight);
+        this.offsetX = this.clamp(this.offsetX, -this.image.width * this.scale, canvas.width);
+        this.offsetY = this.clamp(this.offsetY, -this.image.height * this.scale, canvas.height);
         this.drawAll();
       }
       
       if (!this.contextMenuVisible) {
-        // Проверяем, наведен ли курсор на датчик для отображения информации
+        // Проверяем, наведен ли курсор на датчик
         const sensor = this.sensors.find(sensor => Math.hypot(sensor.x - x, sensor.y - y) <= this.sensorSize * (this.hoveredSensor ? this.hoveredSensorScale : 1) / this.scale);
         
         if (sensor && sensor.floor === this.mall.floor) {
@@ -426,8 +564,8 @@ export default {
 
       this.scale = newScale;
 
-      this.offsetX = this.clamp(this.offsetX, -this.image.width * this.scale, this.canvasWidth);
-      this.offsetY = this.clamp(this.offsetY, -this.image.height * this.scale, this.canvasHeight);
+      this.offsetX = this.clamp(this.offsetX, -this.image.width * this.scale, canvas.width);
+      this.offsetY = this.clamp(this.offsetY, -this.image.height * this.scale, canvas.height);
       
       this.drawAll();
     },
@@ -468,7 +606,7 @@ export default {
         x,
         y,
         floor: this.mall.floor,
-        mac: '192.168.0.1',
+        mac: '00:00:00:00:00:00',
         state: 1,
         accessible: 1,
         color: "blue"
@@ -498,6 +636,20 @@ export default {
       sensor.state = event.target.checked ? 1 : 0;
       this.drawAll();
       console.log(`Sensor ${sensor.mac} state changed to: ${sensor.state}`);
+    },
+    async createRequest() {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = localStorage.getItem('token');
+      const $this = this;
+      await this.$axios.post(`api/sensors/${this.selectedSensor.mac}/request-create`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(function(response) {
+        $this.selectedSensor.requestCreated = 1;
+      }).catch(function(error) {
+        console.error(error);
+        const msg = error?.response?.data.error || error;
+        alert(error);
+      });
     }
   }
 };
@@ -527,7 +679,8 @@ canvas:active {
   border: 1px solid #ddd;
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
   padding: 5px;
-  z-index: this.sensorSize;
+  z-index: 1rem;
+  /* z-index: this.sensorSize; */
   border-radius: 8px;
 }
 

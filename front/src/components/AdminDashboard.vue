@@ -1,12 +1,31 @@
 <template>
     <TopBar/>
-    <div style="padding: 1rem; display: flex; margin: auto; max-width: 70rem;">
-    <MallsList/>
+    <div style="margin: auto; max-width: 70rem;">
+    <div style="display: flex;">
       <div>
+        <h2 style="margin-top: 1rem;">Управление</h2>
+        <MallsList/>
+      </div>
+      <div style="margin-left: 1rem;">
+        <h2 style="margin-top: 1rem;">Заявки</h2>
+        <ul style="list-style: none;">
+          <li v-for="request in requests" :key="request.id">
+            <div class="white_box" style="max-width: 50rem; margin-bottom: 1rem;">
+              <p>{{ request.author_name }} - {{ request.author_email }}</p>
+              <p>MAC: {{ request.sensor_mac }}</p>
+              <div class="button_container">
+                <button @click="request_approve(request.sensor_mac, request.author_email)" class="button_green">Одобрить</button>
+                <button @click="request_reject(request.sensor_mac, request.author_email)" class="button_red">Отклонить</button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div style="margin-left: 1rem;">
         <h2 style="margin-top: 1rem">Заявки на регистрацию</h2>
-        <ul>
+        <ul style="list-style: none;">
           <li v-for="user in pending_users" :key="user.id">
-            <div class="white_box" style="margin: auto; max-width: 50rem; margin-bottom: 1rem;">
+            <div class="white_box" style="max-width: 50rem; margin-bottom: 1rem;">
               {{ user.name }} - {{ user.email }} ({{ user.role }})
               <div class="button_container">
                 <button @click="approve(user)" class="button_green">Одобрить</button>
@@ -16,7 +35,7 @@
           </li>
         </ul>
       </div>
-      
+    </div>
     </div>
 </template>
   
@@ -31,7 +50,8 @@
     },
     data() {
       return {
-        pending_users: []
+        pending_users: [],
+        requests: []
       };
     },
     async created() {
@@ -59,6 +79,18 @@
         headers: { Authorization: `Bearer ${token}` }
       }).then(function(response) {
         $this.pending_users = response.data;
+      }).catch(function(error) {
+        const msg = error?.response?.data.error || error;
+        alert(msg);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        $this.$router.push('/');
+      });
+
+      this.$axios.get(`/api/sensors/requests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(function(response) {
+        $this.requests = response.data;
       }).catch(function(error) {
         const msg = error?.response?.data.error || error;
         alert(msg);
@@ -95,6 +127,34 @@
         } catch (error) {
           console.error(error);
         }
+      },
+      async request_approve(mac, email) {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const token = localStorage.getItem('token');
+        const $this = this;
+        await this.$axios.post(`/api/sensors/${mac}/request-approve`, {
+          headers: { Authorization: `Bearer ${token}` },
+          email: email
+        }).then(function(response) {
+          alert('Одобрено');
+          $this.requests = $this.requests.filter(r => !(r.sensor_mac == mac && r.author_email == email));
+        }).catch(function(error) {
+
+        });
+      },
+      async request_reject(mac, email) {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const token = localStorage.getItem('token');
+        const $this = this;
+        await this.$axios.post(`/api/sensors/${mac}/request-reject`, {
+          headers: { Authorization: `Bearer ${token}` },
+          email: email
+        }).then(function(response) {
+          alert('Отклонено');
+          $this.requests = $this.requests.filter(r => !(r.sensor_mac == mac && r.author_email == email));
+        }).catch(function(error) {
+
+        });
       }
     }
   };

@@ -6,6 +6,10 @@ import sqlite3
 import hashlib
 import hmac
 import os
+import re
+
+import datetime
+from collections import defaultdict
 
 ROLE_ADMIN  = 0
 ROLE_CLIENT = 1
@@ -28,6 +32,10 @@ USER_DEFAULT = {
 
 DB_REL_PATH = '../database/db.db'
 DB_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), DB_REL_PATH)
+
+MAC_REGEX = r'^([0-9a-fA-F]{2}[:]){5}([0-9a-fA-F]{2})$'
+
+LOGS_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'input.txt')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = b'577dc65e3d182756827f1dcdd3db7cdfa70badddd4146e103f45e6d40aac9e36'
@@ -218,6 +226,8 @@ def get_mall_data(mall_id: int):
 
         cursor.execute('SELECT * FROM sensor_of_user WHERE user_id = ? AND sensor_id = ?', (g.user_id, sensor_id))
         accessible = cursor.fetchone() is not None
+        cursor.execute('SELECT * FROM requests WHERE author_id = ? AND sensor_mac = ?', (g.user_id, db_sensor[1]))
+        request_created = cursor.fetchone() is not None
         sensor_in_mall = {
             'x': int(db_sensor_in_mall[3]),
             'y': int(db_sensor_in_mall[4]),
@@ -225,6 +235,7 @@ def get_mall_data(mall_id: int):
             'mac': db_sensor[1],
             'state': int(db_sensor[2]),
             'accessible': int(accessible),
+            'requestCreated': int(request_created),
         }
         sensors_in_mall.append(sensor_in_mall)
     con.close()
@@ -248,6 +259,8 @@ def set_mall_data(mall_id: int):
     con = sqlite3.connect(DB_PATH)
     cursor = con.cursor()
     for sensor_front in sensors:
+        if re.match(MAC_REGEX, sensor_front['mac']) is None:
+            continue
         cursor.execute('SELECT * FROM sensors WHERE mac = ?', (sensor_front['mac'],))
         sensor = cursor.fetchone()
         if not sensor:
@@ -264,10 +277,172 @@ def set_mall_data(mall_id: int):
     con.close()
     return jsonify({'message': 'done'})
 
+def parse_file(file_path):
+    """ Парсит входной файл и возвращает список записей. """
+    records = []
+    current_ap = None
+    current_time = None
+
+    with open(file_path, "r") as file:
+        for line in file:
+            line = line.strip()
+            if not line:
+                continue
+
+            if line.startswith("AP:"):
+                current_ap = line.split()[1]
+            elif len(line.split()) == 2 and ":" in line.split()[1]:
+                try:
+                    current_time = datetime.datetime.strptime(line, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    print(f"Ошибка преобразования времени: {line}")
+            else:
+                # Предполагаем, что это MAC клиента и RSSI
+                try:
+                    client_mac, rssi = line.split()
+                    records.append((current_time, current_ap, client_mac, int(rssi)))
+                except ValueError:
+                    print(f"Ошибка обработки строки: {line} (AP: {current_ap}, Time: {current_time})")
+
+    return records
+
+def transform_records(records):
+    """ Преобразует записи в необходимую структуру. """
+    delta_time = datetime.timedelta(seconds=240)
+    transformed = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+
+    start_time = records[0][0]
+    for timestamp, radar_mac, client_mac, rssi in records:
+        if timestamp - start_time > delta_time:
+            start_time = timestamp
+
+        transformed[start_time][client_mac][radar_mac].append(rssi)
+
+    return transformed
+
+def write_output(transformed):
+    список = []
+    for timestamp, clients in transformed.items():
+        unit = {}
+        unit['timestamp'] = timestamp
+        unit['devices'] = []
+
+        for client, radars in clients.items():
+            device = {}
+            device['mac'] = client
+            device['sensors'] = []
+
+            for radar_mac, rssi_list in radars.items():
+                avg_rssi = sum(rssi_list) // len(rssi_list) # Средний RSSI
+                sensor = {}
+                sensor['mac'] = radar_mac
+                sensor['rssi'] = avg_rssi
+                device['sensors'].append(sensor)
+            device['sensors'] = sorted(device['sensors'], key=lambda sensor: -sensor['rssi'])[:3]
+            max_rssi = max(sensor['rssi'] for sensor in device['sensors'])
+            for sensor in device['sensors']:
+                if sensor['rssi'] == 0:
+                    sensor['normalized_rssi'] = 1
+                else:
+                    sensor['normalized_rssi'] = abs(max_rssi / sensor['rssi'])**2
+            unit['devices'].append(device)
+        список.append(unit)
+    return список
+
 @app.route('/api/malls/<int:mall_id>/devices', methods=['GET'])
 @check_auth
 def get_detected_devices(mall_id: int):
-    jsonify({'message': 'done'}) 
+    records = parse_file(LOGS_FILE)
+    transformed = transform_records(records)
+    output = write_output(transformed)
+    # app.logger.info()
+    return jsonify(output) 
+
+@app.route('/api/sensors/<string:sensor_mac>/request-create', methods=['POST'])
+@check_auth
+def create_sensor_request(sensor_mac: str):
+    con = sqlite3.connect(DB_PATH)
+    cursor = con.cursor()
+    if re.match(MAC_REGEX, sensor_mac) is None:
+        con.close()
+        return jsonify({'error': 'No mac provided'}), 403
+    cursor.execute('INSERT INTO requests (author_id, sensor_mac) VALUES (?, ?)', (g.user_id, sensor_mac))
+    con.commit()
+    con.close()
+    return jsonify({'status': 'Запрос создан'}), 201
+
+@app.route('/api/sensors/<string:sensor_mac>/request-approve', methods=['POST'])
+@check_auth
+def approve_sensor_request(sensor_mac: str):
+    data = request.json
+    email = data.get('email')
+    con = sqlite3.connect(DB_PATH)
+    cursor = con.cursor()
+    if re.match(MAC_REGEX, sensor_mac) is None:
+        con.close()
+        return jsonify({'error': 'No mac provided'}), 403
+    
+    cursor.execute('SELECT sensor_id FROM sensors WHERE mac = ?', (sensor_mac,))
+    sensor_id = cursor.fetchone()
+    cursor.execute('SELECT user_id FROM users WHERE email = ?', (email,))
+    user_id = cursor.fetchone()
+    if not sensor_id or not user_id:
+        con.close()
+        return jsonify({'error': 'Wrong sensor_id or user_id'}), 404
+    
+    cursor.execute('INSERT INTO sensor_of_user VALUES (?, ?)', (sensor_id[0], user_id[0]))
+    cursor.execute(f'DELETE FROM requests WHERE author_id = ? AND sensor_mac = ?', (user_id[0], sensor_mac))
+    con.commit()
+    con.close()
+    return jsonify({'status': 'Одобрено'}), 201
+
+@app.route('/api/sensors/<string:sensor_mac>/request-reject', methods=['POST'])
+@check_auth
+def reject_sensor_request(sensor_mac: str):
+    data = request.json
+    email = data.get('email')
+    con = sqlite3.connect(DB_PATH)
+    cursor = con.cursor()
+    if re.match(MAC_REGEX, sensor_mac) is None:
+        con.close()
+        return jsonify({'error': 'No mac provided'}), 403
+    
+    cursor.execute('SELECT sensor_id FROM sensors WHERE mac = ?', (sensor_mac,))
+    sensor_id = cursor.fetchone()
+    cursor.execute('SELECT user_id FROM users WHERE email = ?', (email,))
+    user_id = cursor.fetchone()
+    if not sensor_id or not user_id:
+        con.close()
+        return jsonify({'error': 'Wrong sensor_id or user_id'}), 404
+
+    cursor.execute(f'DELETE FROM requests WHERE author_id = ? AND sensor_mac = ?', (user_id[0], sensor_mac))
+    con.commit()
+    con.close()
+    return jsonify({'status': 'Одобрено'}), 201
+
+@app.route('/api/sensors/requests', methods=['GET'])
+@check_auth
+def get_sensor_requests():
+    con = sqlite3.connect(DB_PATH)
+    cursor = con.cursor()
+    cursor.execute('SELECT * FROM requests')
+    results = cursor.fetchall()
+
+    requests = []
+    for res in results:
+        cursor.execute('SELECT email, name FROM users WHERE user_id = ?', (res[1],))
+        user = cursor.fetchone()
+        if not user:
+            continue
+        tmp = {
+            'author_name': user[1],
+            'author_email': user[0],
+            'sensor_mac': res[2]
+        }
+        requests.append(tmp)
+
+    con.close()
+    return jsonify(requests)
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -300,25 +475,22 @@ def register():
     email = data.get('email')
     password = data.get('password')
     name = data.get('name')
-    store_name = data.get('storeName')
 
     con = sqlite3.connect(DB_PATH)
     cursor = con.cursor()
     cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
     u = cursor.fetchone()
     if u:
+        con.close()
         return jsonify({'error': 'Клиент с таким почтовым адресом уже существует'}), 401
 
     computed_hash = hmac.new(key=app.config['SECRET_KEY'], msg=str(email + ':' + password).encode(), digestmod=hashlib.sha256).hexdigest()
     blob_hash = bytes.fromhex(computed_hash)
 
     cursor.execute('INSERT INTO users (is_active, email, hash, role, name) VALUES (?, ?, ?, ?, ?)', (0, email, blob_hash, ROLE_CLIENT, name))
-    cursor.execute('SELECT user_id FROM users WHERE email = ?', (email,))
-    user_id = cursor.fetchone()[0]
-    cursor.execute('INSERT INTO stores (owner_id, store_name) VALUES (?, ?)', (user_id, store_name))
+
     con.commit()
     con.close()
-
     return jsonify({'status': 'Запрос на регистрацию отправлен'}), 201
 
 @app.route('/api/pending-users', methods=['GET'])
@@ -370,20 +542,14 @@ def reject_user():
     update_sqlite_sequence()
     return jsonify({'message': 'done'})
 
-@app.route('/api/sensors/<string:sensor_mac>/activate', methods=['POST'])
-@check_auth
-def activate_sensor(sensor_mac):
-    con = sqlite3.connect(DB_PATH)
-    cursor = con.cursor()
-    cursor.execute()
-    con.commit()
-    con.close()
-    jsonify({'message': 'done'})
-
 def main():
-    # app.run(host='192.168.90.203', debug=True)
-    # app.run(host='192.168.88.137', debug=True)
-    app.run(debug=True)
+    host = '192.168.90.203'
+    local = True
+
+    if local:
+        app.run(debug=True)
+    else:
+        app.run(host=host, debug=True)
 
 if __name__ == '__main__':
     main()

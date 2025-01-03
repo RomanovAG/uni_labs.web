@@ -10,7 +10,6 @@
         <input v-model="formData.name" type="text" placeholder="Имя" required name="name" autocomplete="name" />
         <input v-model="formData.email" type="email" placeholder="Электронная почта" required name="email" autocomplete="email" />
         <input v-model="formData.password" type="password" placeholder="Пароль" required name="password" />
-        <input v-model="formData.storeName" type="text" placeholder="Название магазина" required name="store_name" />
         <button type="submit">Зарегистрироваться</button>
       </form>
   </div>
@@ -24,7 +23,6 @@
           name: "",
           email: "",
           password: "",
-          storeName: ""
         }
       };
     },

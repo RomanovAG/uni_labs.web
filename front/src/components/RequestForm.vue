@@ -13,7 +13,6 @@
       </select>
     </div>
 
-    <!-- Форма, динамически меняющаяся в зависимости от выбранной темы -->
     <div class="form-group" v-if="selectedTopic">
       <!-- Поля для темы "Запрос на выделение датчиков" -->
       <div v-if="selectedTopic === 'sensors'">
@@ -29,7 +28,6 @@
         <input type="number" v-model="requestDetails.quantity" id="quantity" min="1" max="1000" placeholder="Введите количество" />
       </div>
 
-      <!-- Поля для другой темы, например, "Запрос на обслуживание" -->
       <div v-if="selectedTopic === 'maintenance'">
         <div class="form-group">
         <select v-model="selectedStore" id="store">

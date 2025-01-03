@@ -2,11 +2,11 @@
   <div class="top-bar">
     <div style="margin: auto; max-width: 70rem;">
       <div style="display: flex;">
-        <router-link to="/home" class="home-link">
+        <router-link to="/home" class="home-link" title="Домашняя страница">
           {{ user.name }} ({{ user.role }}) 
         </router-link>
         <router-link :to="'/' + user.role + 's/profile/settings'" class="settings-link" style="margin-right: 1em;">Настройки</router-link>
-        <button @click="logout" class="button_red" style="padding: 0; height: 2rem; width: 4rem">Выйти</button>
+        <button @click="logout" class="button_red" style="padding: 0; height: 2rem; width: 4rem" title="Выйти из аккаунта">Выйти</button>
       </div>
     </div>
   </div>
