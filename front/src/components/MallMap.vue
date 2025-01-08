@@ -1,10 +1,8 @@
 <template>
-<!-- <router-view :key="$route.fullPath"></router-view> -->
 <TopBar/>
-
 <div>
   <div class="canvas-container" @contextmenu.prevent style="display: flex;">
-    <div v-if="isAdminComp" class="white_box" style="margin: 1rem; display: block;padding: 1rem;">
+    <div v-if="isAdminComp" class="white_box" style="margin: 1rem; display: block; padding: 1rem;">
       <button @click="saveSensorsData" class="button_blue" style="margin: 0.25rem; min-width: 3rem;" title="Сохранить состояние и расположение датчиков">Сохранить</button>
     </div>
 
@@ -128,9 +126,13 @@
   <div style="margin-top: 1rem;">
     <div style="margin: auto; max-width: 75%; text-align: center;">
       <div style="margin: auto; display: flex; max-height: 7rem;">
-        <div class="white_box" style="flex: 25%;">
+        <div class="white_box" style="flex: 25%; text-align: left;">
           <span>Точность:</span>
           <input type="number" style="margin-left: 1rem;" v-model="precision" id="precision" step="1" min="1" max="3" @change="drawAll"/>
+          <div></div>
+          <span>В реальном времени:</span>
+          <input type="checkbox" :checked="realTime === true" v-model="realTime" style="margin-left: 1rem;" @change="updateData">
+          </input>
         </div>
         <div class="white_box" style="flex: 85%; margin-left: 1rem;">
           <input type="range" style="margin-left: 1rem; min-width: 75%;"
@@ -144,19 +146,22 @@
         </div>
       </div>
     </div>
-    <div v-if="currentData">
+    <!-- <select v-if="currentData && isAdminComp">
+      <option>
+        <p>Данные:</p>
+        <pre>{{ currentData.devices }}</pre>
+      </option>
+    </select> -->
+    <div v-if="currentData && isAdminComp">
       <p>Данные:</p>
-      <pre>{{ currentData.devices }}</pre>
-    </div>
+        <pre>{{ currentData.devices }}</pre>
+      </div>
   </div>
-  <div style="display: block;">
+  <!-- <div style="display: block;">
     <span>Размер датчиков:</span>
     <input type="number" style="" v-model="sensorSize" id="sensorSize" step="1" @change="drawAll" />
-  </div>
+  </div> -->
 </div>
-<!-- <div>
-  scale: {{ this.scale }}; img x: {{ this.offsetX }} y: {{ this.offsetY }};
-</div> -->
 </template>
 
 <script>
@@ -170,12 +175,12 @@ export default {
   },
   data() {
     return {
-      offsetX: 0,               // Позиция X изображения
-      offsetY: 0,               // Позиция Y изображения
-      scale: 1,                // Масштаб изображения
-      isPanning: false,       // Флаг для отслеживания перетаскивания
-      panStartX: 0,           // Начальная позиция X при перетаскивании
-      panStartY: 0,           // Начальная позиция Y при перетаскивании
+      offsetX: 0,
+      offsetY: 0,
+      scale: 1,
+      isPanning: false,
+      panStartX: 0,
+      panStartY: 0,
       isDragging: false,
       dragOffset: { x: 0, y: 0 },
 
@@ -208,6 +213,9 @@ export default {
       transformedData: [],
       selectedTimestampIndex: 0,
       precision: 1,
+      realTime: false,
+
+      taskId: null,
     };
   },
   computed: {
@@ -247,6 +255,7 @@ export default {
       alert(error);
     });
     this.getDevices();
+    this.startTask();
     document.title =  this.mall.name || route.path;
 
     this.$nextTick(() => {
@@ -266,8 +275,31 @@ export default {
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.setCanvasSize);
+    clearInterval(this.taskId);
+  },
+  beforeRouteLeave (to, from, next) {
+    clearInterval(this.taskId);
+    next();
   },
   methods: {
+    async updateData() {
+      await this.getDevices();
+      this.selectedTimestampIndex = this.transformedData.length - 1;
+      this.drawAll();
+    },
+    startTask() {
+      this.taskId = setInterval(() => {
+        if (this.realTime !== true) return;
+        //console.log('task');
+        //return;
+        this.getDevices();
+        this.selectedTimestampIndex = this.transformedData.length - 1;
+        this.drawAll();
+      }, 120 * 1000);
+    },
+    endTask() {
+      clearInterval(this.taskId);
+    },
     updateSelectedTimestamp() {
       this.drawAll();
     },
@@ -286,7 +318,7 @@ export default {
       const canvas = this.$refs.canvas;
       try {
         canvas.width = window.innerWidth*0.6;
-        canvas.height = window.innerHeight*0.75;
+        canvas.height = window.innerHeight*0.7125;
         this.drawAll();
       } catch (error) {}
     },
@@ -297,7 +329,7 @@ export default {
       await this.$axios.get(`/api/malls/${this.mall.id}/devices`, {
         headers: { 'Authorization': `Bearer ${token}` }
       }).then(function(response) {
-        console.log(response.data);
+        // console.log(response.data);
         $this.transformedData = response.data;
       });
     },
@@ -461,7 +493,7 @@ export default {
         y /= coeff;
 
         if (this.precision > active) return;
-        if (Math.round(floor) !== this.mall.floor) return;
+        if (floor !== this.mall.floor) return;
         //this.drawSmoothPentagon(x, y, sensorSize * 1.25 / this.scale, 5 / this.scale, context);
         context.beginPath();
         context.arc(x, y, sensorSize / 2 / this.scale, 0, 2 * Math.PI);

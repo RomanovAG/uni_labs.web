@@ -268,7 +268,10 @@ def set_mall_data(mall_id: int):
             cursor.execute('SELECT * FROM sensors WHERE mac = ?', (sensor_front['mac'],))
             sensor = cursor.fetchone()
         else:
-            cursor.execute('UPDATE sensors SET state = ? WHERE mac = ?', (sensor_front['state'], sensor_front['mac']))
+            if (int(sensor_front['state']) == 0):
+                cursor.execute(f'UPDATE sensors SET state = 0 WHERE sensor_id = ?', (sensor[0],))
+            else:
+                cursor.execute(f'UPDATE sensors SET state = 1 WHERE sensor_id = ?', (sensor[0],))
 
         cursor.execute('INSERT INTO sensor_in_mall (sensor_id, mall_id, x, y, floor, date_start, date_end) VALUES (?, ?, ?, ?, ?, ?, ?)',
                        (int(sensor[0]), int(mall_id), int(sensor_front['x']), int(sensor_front['y']), int(sensor_front['floor']), '-', '-'))
@@ -403,22 +406,17 @@ def reject_sensor_request(sensor_mac: str):
     email = data.get('email')
     con = sqlite3.connect(DB_PATH)
     cursor = con.cursor()
-    if re.match(MAC_REGEX, sensor_mac) is None:
-        con.close()
-        return jsonify({'error': 'No mac provided'}), 403
-    
-    cursor.execute('SELECT sensor_id FROM sensors WHERE mac = ?', (sensor_mac,))
-    sensor_id = cursor.fetchone()
+
     cursor.execute('SELECT user_id FROM users WHERE email = ?', (email,))
     user_id = cursor.fetchone()
-    if not sensor_id or not user_id:
+    if not user_id:
         con.close()
-        return jsonify({'error': 'Wrong sensor_id or user_id'}), 404
-
+        return jsonify({'error': 'Wrong email'}), 404
+    
     cursor.execute(f'DELETE FROM requests WHERE author_id = ? AND sensor_mac = ?', (user_id[0], sensor_mac))
     con.commit()
     con.close()
-    return jsonify({'status': 'Одобрено'}), 201
+    return jsonify({'status': 'Отклонено'}), 201
 
 @app.route('/api/sensors/requests', methods=['GET'])
 @check_auth

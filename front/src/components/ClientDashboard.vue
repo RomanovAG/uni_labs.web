@@ -1,21 +1,21 @@
 <template>
-  <TopBar></TopBar>
-  <h2 style="margin-top: 1rem; margin-bottom: 0;">Добро пожаловать, {{ client?.name }}!</h2>
-  <div style=" padding: 1rem;">
-  <div style="display: flex; margin: auto; max-width: 70rem;">
-    <MallsList/>
+  <TopBar/>
+  <h2 style="margin-top: 1rem;">Добро пожаловать, {{ client?.name }}!</h2>
+  
+  <div style="margin: auto; max-width: 70rem; text-align: center;">
+  <h2>Список обслуживаемых торговых центров</h2>
+    <MallsList style="margin: auto;"></MallsList>
     <!-- <div class="white_box" style="flex: 5; width: 100%;">
       <p style="margin-bottom: 1rem;">Информация о ваших магазинах:</p>
         <li v-for="mall in stores" :key="mall.id" style="list-style-type: none;">
           <button @click="goToMall(mall)" class="button_blue" style="width: 100%; height: 100%; height: 10rem;">{{ mall?.storeName }}</button>
         </li>
     </div> -->
-    <div style="flex: 3; width: 100%; margin-left: 1rem;">
+    <!-- <div style="flex: 3; width: 100%; margin-left: 1rem;">
       <RequestForm class="white_box">
       </RequestForm>
+    </div> -->
     </div>
-    </div>
-  </div>
 </template>
   
 <script>
