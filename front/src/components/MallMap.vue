@@ -133,6 +133,9 @@
           <span>В реальном времени:</span>
           <input type="checkbox" :checked="realTime === true" v-model="realTime" style="margin-left: 1rem;" @change="updateData">
           </input>
+          <div></div>
+          <span>Кол-во отображаемых устройств: </span>
+          <span>{{ devicesNum }}</span>
         </div>
         <div class="white_box" style="flex: 85%; margin-left: 1rem;">
           <input type="range" style="margin-left: 1rem; min-width: 75%;"
@@ -214,6 +217,7 @@ export default {
       selectedTimestampIndex: 0,
       precision: 1,
       realTime: false,
+      devicesNum: 0,
 
       taskId: null,
     };
@@ -468,6 +472,7 @@ export default {
       context.translate(this.offsetX, this.offsetY);
       context.scale(this.scale, this.scale);
 
+      this.devicesNum = 0;
       this.currentData?.devices.forEach((device) => {
         let [ x, y ] = [ 0, 0 ];
         let [ r, g, b ] = [ 255, 128, 0 ];
@@ -501,6 +506,7 @@ export default {
         context.lineWidth = 1 / this.scale;
         context.strokeStyle = 'black';
         context.stroke();
+        this.devicesNum++;
       });
       context.restore();
     },
